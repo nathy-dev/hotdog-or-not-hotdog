@@ -11,13 +11,20 @@ import * as Permissions from 'expo-permissions'
 import * as ImagePicker from 'expo-image-picker'
 import uuid from 'uuid'
 import UploadingOverlay from './components/UploadingOverlay'
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import GOOGLE_VISION_API_KEY from './config/Api'
-import firebase from './config/Firebase'
+import FIREBASE_CONFIG from './config/Firebase'
+import { getApps, initializeApp } from "firebase/app";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const API_KEY = GOOGLE_VISION_API_KEY;
 
+if (!getApps().length) {
+  initializeApp(FIREBASE_CONFIG);
+}
+
 async function uploadImageAsync(uri) {
+  // Why are we using XMLHttpRequest? See:
+  // https://github.com/expo/expo/issues/2402#issuecomment-443726662
   const blob = await new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.onload = function () {
@@ -32,18 +39,14 @@ async function uploadImageAsync(uri) {
     xhr.send(null);
   });
 
-  const fileRef = firebase
-  .getStorage()
-  .ref()
-  .child(uuid.v4())
-
+  const fileRef = ref(getStorage(), uuid.v4());
   const result = await uploadBytes(fileRef, blob);
 
+  // We're done with the blob, close and release it
   blob.close();
 
   return await getDownloadURL(fileRef);
 }
-
 class App extends Component {
   state = {
     hasGrantedCameraPermission: false,
