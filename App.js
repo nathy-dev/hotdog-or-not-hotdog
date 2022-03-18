@@ -1,40 +1,47 @@
-import { GOOGLE_VISION_API_KEY } from './config/Api';
 import React, { Component } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, LogBox, Image } from 'react-native'
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image
+} from 'react-native'
 import { Header, Icon, Button } from 'react-native-elements'
 import * as Permissions from 'expo-permissions'
 import * as ImagePicker from 'expo-image-picker'
 import uuid from 'uuid'
 import UploadingOverlay from './components/UploadingOverlay'
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import GOOGLE_VISION_API_KEY from './config/Api'
 import firebase from './config/Firebase'
 
 const API_KEY = GOOGLE_VISION_API_KEY;
-LogBox.ignoreWarnings(['Setting a timer'])
 
 async function uploadImageAsync(uri) {
   const blob = await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.onload = function() {
-      resolve(xhr.response)
-    }
-    xhr.onerror = function(e) {
-      console.log(e)
-      reject(new TypeError('Network request failed'))
-    }
-    xhr.responseType = 'blob'
-    xhr.open('GET', uri, true)
-    xhr.send(null)
-  })
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      resolve(xhr.response);
+    };
+    xhr.onerror = function (e) {
+      console.log(e);
+      reject(new TypeError("Network request failed"));
+    };
+    xhr.responseType = "blob";
+    xhr.open("GET", uri, true);
+    xhr.send(null);
+  });
 
-  const ref = firebase
-    .storage()
-    .ref()
-    .child(uuid.v4())
-  const snapshot = await ref.put(blob)
+  const fileRef = firebase
+  .getStorage()
+  .ref()
+  .child(uuid.v4())
 
-  blob.close()
+  const result = await uploadBytes(fileRef, blob);
 
-  return await snapshot.ref.getDownloadURL()
+  blob.close();
+
+  return await getDownloadURL(fileRef);
 }
 
 class App extends Component {
@@ -53,7 +60,6 @@ class App extends Component {
 
   cameraRollAccess = async () => {
     const { status } = await Permissions.askAsync(Permissions.CAMERA_ROLL)
-    // console.log('camera roll status', status)
     if (status === 'granted') {
       this.setState({ hasGrantedCameraRollPermission: true })
     }
@@ -61,45 +67,47 @@ class App extends Component {
 
   cameraAccess = async () => {
     const { status } = await Permissions.askAsync(Permissions.CAMERA)
-    // console.log('camera status', status)
     if (status === 'granted') {
       this.setState({ hasGrantedCameraPermission: true })
     }
   }
 
+
   takePhoto = async () => {
     let pickerResult = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      aspect: [4, 3]
-    })
+      aspect: [4, 3],
+    });
 
-    this.handleImagePicked(pickerResult)
-  }
+    this.handleImagePicked(pickerResult);
+  };
 
   pickImage = async () => {
     let pickerResult = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
-      aspect: [4, 3]
-    })
+      aspect: [4, 3],
+    });
 
-    this.handleImagePicked(pickerResult)
-  }
+    console.log({ pickerResult });
 
-  handleImagePicked = async pickerResult => {
+    this.handleImagePicked(pickerResult);
+  };
+
+  handleImagePicked = async (pickerResult) => {
     try {
-      this.setState({ uploading: true })
+      this.setState({ uploading: true });
 
       if (!pickerResult.cancelled) {
-        uploadUrl = await uploadImageAsync(pickerResult.uri)
-        this.setState({ image: uploadUrl })
+        const uploadUrl = await uploadImageAsync(pickerResult.uri);
+        this.setState({ image: uploadUrl });
       }
-    } catch (error) {
-      console.log(error)
-      alert('Image Upload failed')
+    } catch (e) {
+      console.log(e);
+      alert("Upload failed, sorry :(");
     } finally {
-      this.setState({ uploading: false })
+      this.setState({ uploading: false });
     }
-  }
+  };
 
   submitToGoogle = async () => {
     try {
@@ -129,17 +137,14 @@ class App extends Component {
         }
       )
       let responseJson = await response.json()
-      // console.log(responseJson)
       const getLabel = responseJson.responses[0].labelAnnotations.map(
         obj => obj.description
       )
 
-      // console.log('getLabel', getLabel)
       let result =
         getLabel.includes('Hot dog') ||
         getLabel.includes('hot dog') ||
         getLabel.includes('Hot dog bun')
-      // console.log(result)
 
       this.setState({
         googleResponse: result,
@@ -164,7 +169,7 @@ class App extends Component {
           />
           <View style={styles.imageContainer}>
             <Text style={styles.title}>
-              Upload an image to verify a hotdog!
+              Our state of the art AI will confirm if hot dog
             </Text>
             <Text style={styles.hotdogEmoji}>🌭</Text>
           </View>
@@ -222,7 +227,7 @@ class App extends Component {
               </TouchableOpacity>
             }
             centerComponent={{
-              text: 'Not Hotdog?',
+              text: 'Hot Dog or Not Hot Dog?',
               style: styles.headerCenter
             }}
             rightComponent={
@@ -244,11 +249,11 @@ class App extends Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#cafafe'
+    backgroundColor: '#ffc266'
   },
   headerCenter: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold'
   },
   renderImageContainer: {
@@ -256,7 +261,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   button: {
-    backgroundColor: '#97caef',
+    backgroundColor: '#ff9900',
     borderRadius: 10,
     width: 150,
     height: 50
@@ -280,3 +285,5 @@ const styles = StyleSheet.create({
     fontSize: 90
   }
 })
+
+export default App
